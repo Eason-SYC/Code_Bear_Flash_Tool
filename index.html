@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8" />
+  <title>固件在线下载</title>
+  <meta name="description" content="一个基于文件夹结构动态加载的网页固件安装程序。" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="dark light" />
+
+  <script type="module" src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module"></script>
+
+  <style>
+    /* --- 全局字体与基础布局 --- */
+    :root {
+      /* 定义基础字体，优先使用系统UI字体，保证清爽 */
+      font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI",
+        "Helvetica Neue", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
+        Arial, sans-serif;
+    }
+    
+    body {
+      padding: 0;
+      margin: 0;
+      line-height: 1.6;
+      /* 平滑的颜色过渡效果 */
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    /* --- 主题变量定义 --- */
+    
+    /* 主题 1: 活力蓝 (默认) - 科技、清爽 */
+    .theme-blue {
+      --primary-color: hsl(210, 90%, 55%);
+      --background-color: hsl(210, 40%, 98%); /* 非常浅的淡蓝色背景，代替纯白 */
+      --text-color: hsl(210, 20%, 20%); /* 深灰色文字，比纯黑更柔和 */
+      --card-background: #ffffff;
+      --card-border-color: hsl(210, 25%, 90%);
+      --card-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+    }
+    
+    /* 主题 2: 静谧黑 - 简约黑白 */
+    .theme-dark {
+      /* 将主色调从蓝色改为近乎白色的高级灰，用于标题、链接和选中状态 */
+      --primary-color: hsl(0, 0%, 92%); 
+      /* 背景色可以维持或使用纯黑以达到最大对比度 */
+      --background-color: #121212;
+      /* 将主要文字颜色改为更亮的浅灰色，实现“白色字体”效果 */
+      --text-color: hsl(0, 0%, 88%);
+      /* 卡片背景使用深灰色，与主背景形成层次感 */
+      --card-background: hsl(0, 0%, 14%);
+      /* 卡片默认边框颜色调整为可见的灰色，实现“方框”效果 */
+      --card-border-color: hsl(0, 0%, 30%);
+      --card-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    }
+
+    /* 主题 3: 抹茶绿 - 自然、舒适 */
+    .theme-light {
+      --primary-color: hsl(140, 35%, 50%);
+      --background-color: hsl(75, 40%, 96%); /* 温暖的米白色背景 */
+      --text-color: hsl(140, 15%, 25%); /* 深橄榄绿色文字 */
+      --card-background: #ffffff;
+      --card-border-color: hsl(80, 20%, 88%);
+      --card-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+    }
+
+    /* 主题 4: 樱花粉 - 温柔、活泼 */
+    .theme-pink {
+      --primary-color: hsl(340, 80%, 60%);
+      --background-color: hsl(340, 50%, 97%); /* 极浅的粉色调背景 */
+      --text-color: hsl(340, 15%, 30%);
+      --card-background: #ffffff;
+      --card-border-color: hsl(340, 30%, 90%);
+      --card-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+    }
+
+    /* --- 组件样式 (自动应用主题变量) --- */
+    body {
+      background-color: var(--background-color);
+      color: var(--text-color);
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    h1, h2 {
+      color: var(--primary-color);
+      text-align: center;
+      margin-bottom: 1em;
+      font-weight: 600; /* 字体加粗一点更有精神 */
+    }
+
+    a {
+      color: var(--primary-color);
+      text-decoration: none;
+      font-weight: 500;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .footer {
+      margin-top: 48px;
+      border-top: 1px solid var(--card-border-color);
+      padding-top: 24px;
+      text-align: center;
+      font-size: 0.9em;
+      opacity: 0.7;
+    }
+    
+    /* --- 主题切换器 --- */
+    .theme-switcher {
+      position: absolute;
+      top: 15px;
+      right: 15px;
+      display: flex;
+      gap: 10px;
+      padding: 6px;
+      background-color: var(--card-background);
+      border-radius: 24px;
+      box-shadow: var(--card-shadow);
+      border: 1px solid var(--card-border-color);
+    }
+    .theme-button {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      border: 2px solid var(--card-border-color);
+      cursor: pointer;
+      transition: transform 0.2s ease-out;
+    }
+    .theme-button:hover {
+      transform: scale(1.15);
+    }
+    #btn-blue { background-color: #03a9f4; }
+    #btn-dark { background-color: #2e3440; }
+    #btn-light { background-color: #8fbcbb; }
+    #btn-pink { background-color: #e91e63; }
+    
+    /* --- 选择卡片 --- */
+    .selection-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 20px;
+      margin-top: 1em;
+    }
+    .selection-card {
+      background-color: var(--card-background);
+      border: 2px solid var(--card-border-color);
+      border-radius: 12px;
+      padding: 20px 16px;
+      cursor: pointer;
+      transition: all 0.2s ease-in-out;
+      box-shadow: var(--card-shadow);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 12px;
+    }
+    .selection-card:hover {
+      border-color: var(--primary-color);
+      transform: translateY(-4px);
+    }
+    .selection-card.selected {
+      border-color: var(--primary-color);
+      box-shadow: 0 0 0 3px var(--primary-color);
+    }
+    .selection-card img {
+      width: 80px;
+      height: 80px;
+      object-fit: contain;
+    }
+    .selection-card span {
+      font-weight: 500;
+      font-size: 1.1em;
+      text-align: center;
+    }
+
+    /* --- 版本按钮和安装按钮 --- */
+    #version-selection h2 {
+      margin-top: 1.5em;
+    }
+    .version-buttons {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .version-button {
+      background-color: var(--card-background);
+      border: 2px solid var(--primary-color);
+      color: var(--primary-color);
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-size: 1em;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background-color 0.2s, color 0.2s;
+    }
+    .version-button:hover, .version-button.selected {
+      background-color: var(--primary-color);
+      color: var(--card-background); /* 文字颜色反转以保证可读性 */
+    }
+    .install-button-container {
+      text-align: center;
+      margin-top: 40px;
+    }
+
+    /* --- 错误信息 --- */
+    .error-message {
+      color: #ff4d4d;
+      background-color: rgba(255, 77, 77, 0.1);
+      border: 1px solid rgba(255, 77, 77, 0.3);
+      padding: 10px;
+      border-radius: 8px;
+      text-align: left;
+      font-family: monospace;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+	esp-web-install-button {
+	  display: none !important; /* 使用 !important 确保它绝不会被显示出来 */
+	}
+
+	/* 2. 为我们自己的新按钮设计样式 */
+	.install-button {
+	  /* 基础样式 (让它看起来像一个主要的、被选中的操作按钮) */
+	  background-color: var(--primary-color);
+	  color: var(--card-background);
+	  border: 2px solid var(--primary-color);
+	  padding: 12px 28px;
+	  border-radius: 8px;
+	  font-size: 1.1em; /* 让最终的按钮稍微大一点，更醒目 */
+	  font-weight: bold;
+	  cursor: pointer;
+	  transition: all 0.2s ease-in-out;
+	  
+	  /* 添加一点阴影，让它更有立体感 */
+	  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+	}
+
+	/* 3. 设计鼠标悬浮和点击效果 */
+	.install-button:hover {
+	  transform: translateY(-2px);
+	  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+	}
+
+	.install-button:active {
+	  transform: translateY(0);
+	  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+	}
+	</style>
+</head>
+<body class="theme-blue">
+
+  <div class="theme-switcher">
+    <div class="theme-button" id="btn-blue" title="蓝色主题"></div>
+    <div class="theme-button" id="btn-dark" title="深色主题"></div>
+    <div class="theme-button" id="btn-light" title="浅色主题"></div>
+    <div class="theme-button" id="btn-pink" title="粉色主题"></div>
+  </div>
+
+  <div class="container">
+    <h1>固件在线下载</h1>
+    <div id="project-selection">
+      <h2>1. 选择您的项目</h2>
+      <div id="project-grid" class="selection-grid"></div>
+    </div>
+    <div id="device-selection" class="hidden">
+      <h2>2. 选择您的设备</h2>
+      <div id="device-grid" class="selection-grid"></div>
+    </div>
+    <div id="version-selection" class="hidden">
+      <h2>3. 选择固件版本</h2>
+      <div id="version-buttons" class="version-buttons"></div>
+    </div>
+    <div id="install-button-container" class="install-button-container hidden">
+    
+    <!-- [新增] 我们自己的、可以完全自定义样式的按钮 -->
+    <button id="custom-install-button" class="install-button">连接设备</button>
+		<!-- 原始按钮依然保留，但之后会被CSS隐藏。它负责所有的后台逻辑 -->
+		<esp-web-install-button 
+		  connect-text="连接设备"
+		  disconnect-text="断开连接"
+		  install-text="开始安装"
+		  connecting-text="连接中..."
+		  progress-text="安装中..."
+		  error-text="出错了"
+		  logs-text="查看日志"
+		></esp-web-install-button>
+	</div>
+    <div class="footer">
+      Installer powered by <a href="https://esphome.github.io/esp-web-tools/" target="_blank">ESP Web Tools</a>.
+    </div>
+	
+  </div>
+
+<script>
+const FIRMWARE_BASE_PATH = "firmware";
+
+const projectGrid = document.getElementById('project-grid');
+const deviceGrid = document.getElementById('device-grid');
+const versionButtons = document.getElementById('version-buttons');
+const deviceSelection = document.getElementById('device-selection');
+const versionSelection = document.getElementById('version-selection');
+const installButtonContainer = document.getElementById('install-button-container');
+const installButton = document.querySelector('esp-web-install-button');
+
+let selectedProject = null;
+let selectedDevice = null;
+
+function displayError(gridElement, error) {
+    const errorMessage = `<div class="error-message"><strong>加载错误:</strong><br>${error.message}</div>`;
+    gridElement.innerHTML = errorMessage;
+    console.error(error);
+}
+
+function createCard(id, name, imageUrl) {
+  const card = document.createElement('div');
+  card.className = 'selection-card';
+  card.dataset.id = id;
+  card.innerHTML = `<img src="${imageUrl}" alt="${name}"><span>${name}</span>`;
+  return card;
+}
+
+function resetSteps(fromStep) {
+  if (fromStep <= 2) {
+    deviceSelection.classList.add('hidden');
+    deviceGrid.innerHTML = '';
+    selectedDevice = null;
+  }
+  if (fromStep <= 3) {
+    versionSelection.classList.add('hidden');
+    versionButtons.innerHTML = '';
+  }
+  installButtonContainer.classList.add('hidden');
+}
+
+async function populateProjects() {
+    projectGrid.innerHTML = '<p>正在加载项目...</p>';
+    const projectsUrl = `${FIRMWARE_BASE_PATH}/ALL_Project.json`;
+    try {
+        const response = await fetch(projectsUrl);
+        if (!response.ok) {
+            throw new Error(`无法加载项目列表: 服务器返回 ${response.status} (Not Found)。\n请检查文件是否存在于: "${projectsUrl}"`);
+        }
+        
+        const projectFolders = await response.json();
+        projectGrid.innerHTML = ''; 
+
+        if (projectFolders.length === 0) {
+            projectGrid.innerHTML = '<p>没有找到任何项目。请检查 ALL_Project.json 文件内容。</p>';
+            return;
+        }
+
+        for (const folder of projectFolders) {
+            const projectConfigUrl = `${FIRMWARE_BASE_PATH}/${folder}/Project.json`;
+            try {
+                const projResponse = await fetch(projectConfigUrl);
+                if (!projResponse.ok) {
+                   throw new Error(`找不到项目配置文件: ${projectConfigUrl}`);
+                }
+                const projData = await projResponse.json();
+
+                const card = createCard(folder, projData.name, `${FIRMWARE_BASE_PATH}/${folder}/${projData.image}`);
+                card.addEventListener('click', () => {
+                    selectedProject = folder;
+                    document.querySelectorAll('#project-grid .selection-card').forEach(c => c.classList.remove('selected'));
+                    card.classList.add('selected');
+                    resetSteps(2);
+                    populateDevices(projData.devices);
+                });
+                projectGrid.appendChild(card);
+            } catch (innerError) {
+                console.warn(`跳过项目 "${folder}"，因为它加载失败:`, innerError);
+            }
+        }
+    } catch (error) {
+        displayError(projectGrid, error);
+    }
+}
+
+async function populateDevices(deviceFolders) {
+    deviceGrid.innerHTML = '<p>正在加载设备...</p>';
+    deviceSelection.classList.remove('hidden');
+
+    if (!deviceFolders || deviceFolders.length === 0) {
+        deviceGrid.innerHTML = '<p>该项目下没有可用的设备。</p>';
+        return;
+    }
+    
+    let devicesLoaded = false;
+    for (const folder of deviceFolders) {
+        const deviceConfigUrl = `${FIRMWARE_BASE_PATH}/${selectedProject}/${folder}/Device.json`;
+        try {
+            const devResponse = await fetch(deviceConfigUrl);
+            if (!devResponse.ok) {
+                throw new Error(`找不到设备配置文件: 服务器返回 ${devResponse.status}。<br>请检查文件是否存在于: "${deviceConfigUrl}"`);
+            }
+            const devData = await devResponse.json();
+
+            if (!devicesLoaded) {
+                deviceGrid.innerHTML = ''; 
+                devicesLoaded = true;
+            }
+            const card = createCard(folder, devData.name, `${FIRMWARE_BASE_PATH}/${selectedProject}/${folder}/${devData.image}`);
+            card.addEventListener('click', () => {
+                selectedDevice = folder;
+                document.querySelectorAll('#device-grid .selection-card').forEach(c => c.classList.remove('selected'));
+                card.classList.add('selected');
+                resetSteps(3);
+                populateVersions(devData.versions);
+            });
+            deviceGrid.appendChild(card);
+        } catch(error) {
+             displayError(deviceGrid, error);
+             return; 
+        }
+    }
+
+    if (!devicesLoaded) {
+         deviceGrid.innerHTML = '<p>未能加载任何设备信息。</p>';
+    }
+}
+
+function populateVersions(versionFolders) {
+    versionButtons.innerHTML = '';
+    versionSelection.classList.remove('hidden');
+
+    if (!versionFolders || versionFolders.length === 0) {
+        versionButtons.innerHTML = `<p style="text-align: center; color: #888;">该设备下没有可用的固件版本。</p>`;
+        return;
+    }
+
+    for (const folder of versionFolders) {
+        const button = document.createElement('button');
+        button.className = 'version-button';
+        button.textContent = folder;
+        
+        button.addEventListener('click', () => {
+            document.querySelectorAll('#version-buttons .version-button').forEach(b => b.classList.remove('selected'));
+            button.classList.add('selected');
+
+            const manifestPath = `${FIRMWARE_BASE_PATH}/${selectedProject}/${selectedDevice}/${folder}/Download.json`;
+            installButton.manifest = manifestPath;
+            installButtonContainer.classList.remove('hidden');
+        });
+        versionButtons.appendChild(button);
+    }
+}
+
+
+// --- [主题修复] 主题切换逻辑 ---
+function initializeThemes() {
+    const savedTheme = localStorage.getItem('firmware-installer-theme') || 'theme-blue';
+    document.body.className = savedTheme;
+
+    function setTheme(themeName) {
+        document.body.className = themeName;
+        localStorage.setItem('firmware-installer-theme', themeName);
+    }
+
+    document.getElementById('btn-blue').addEventListener('click', () => setTheme('theme-blue'));
+    document.getElementById('btn-dark').addEventListener('click', () => setTheme('theme-dark'));
+    document.getElementById('btn-light').addEventListener('click', () => setTheme('theme-light'));
+    document.getElementById('btn-pink').addEventListener('click', () => setTheme('theme-pink'));
+}
+
+function initializeProxyButton() {
+    const customButton = document.getElementById('custom-install-button');
+    const realInstallButton = document.querySelector('esp-web-install-button');
+
+    if (customButton && realInstallButton) {
+        customButton.addEventListener('click', () => {
+            // 查找 Shadow DOM 内部的真实 <button> 元素
+            const buttonInsideShadowDom = realInstallButton.shadowRoot.querySelector('button');
+            if (buttonInsideShadowDom) {
+                // 程序化地点击它
+                buttonInsideShadowDom.click();
+            } else {
+                console.error("无法在 esp-web-install-button 组件内部找到按钮。");
+            }
+        });
+
+        // 监听真实按钮的状态变化，并更新我们自定义按钮的文本
+        // 这是一个高级功能，可以使我们的按钮文本也动态变化
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+                     const realButtonText = realInstallButton.shadowRoot.querySelector('button').textContent;
+                     // 同步文本
+                     customButton.textContent = realButtonText;
+                }
+            });
+        });
+        
+        // 监视真实按钮的slot变化
+        const slot = realInstallButton.shadowRoot.querySelector('slot');
+        if (slot) {
+             observer.observe(slot, { childList: true });
+        }
+    }
+}
+
+// --- 初始化 ---
+document.addEventListener('DOMContentLoaded', () => {
+    initializeThemes();
+    populateProjects();
+	initializeProxyButton();
+});
+
+</script>
+</body>
+</html>

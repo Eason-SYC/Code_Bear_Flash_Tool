@@ -1,0 +1,7 @@
+{
+  "name": "ESP32-C3",
+  "image": "Device.png",
+  "versions": [
+    "0.16.0"
+  ]
+}

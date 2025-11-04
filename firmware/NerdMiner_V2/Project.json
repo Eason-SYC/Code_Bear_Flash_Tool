@@ -1,0 +1,7 @@
+{
+  "name": "NerdMiner_V2",
+  "image": "NerdMiner_V2.png",
+  "devices": [
+    "ESP32_C3"
+  ]
+}
