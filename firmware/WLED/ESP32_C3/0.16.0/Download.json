@@ -1,5 +1,5 @@
 {
-  "name": "WLED for ESP32-C3",
+  "name": "WLED for ESP32-C3 (Repair)",
   "version": "0.16.0",
   "new_install_prompt_erase": true,
   "builds": [
