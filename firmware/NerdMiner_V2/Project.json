@@ -1,7 +1,0 @@
-{
-  "name": "暂不使用",
-  "image": "NerdMiner_V2.png",
-  "devices": [
-    "ESP32_C3"
-  ]
-}

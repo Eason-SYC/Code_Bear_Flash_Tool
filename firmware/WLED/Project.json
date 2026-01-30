@@ -1,7 +1,0 @@
-{
-  "name": "WLED",
-  "image": "WLED.png",
-  "devices": [
-    "ESP32_C3"
-  ]
-}
